@@ -20,7 +20,6 @@ agent$choice_table$intensity <- world$stimuli$intensity
 agent$choice_table$expected_prob <- world$stimuli$probs
 
 
-
 repetitions <- 1000
 learning_rate <- .01
 
@@ -32,7 +31,7 @@ for(r in 1:repetitions){
   #T1
   agent$emotional_intensity <- world$stimuli$intensity[world$stimuli$index == currentStimulus]
   #print(agent$emotional_intensity)
-  reward_1 <- agent$desired_emotional_intensity - agent$emotional_intensity
+  reward_1 <- 10 - abs(agent$desired_emotional_intensity - agent$emotional_intensity)
   #print(reward_1)
   prob_for_stimuli <- subset(agent$choice_table, agent$choice_table$index == currentStimulus)
   strategy_choice <- sample(c("engage", "disengage"), 1, prob = c(prob_for_stimuli$prob_engage,
@@ -52,7 +51,7 @@ for(r in 1:repetitions){
     agent$choice_table$previously_engaged[currentStimulus] <- agent$choice_table$previously_engaged[currentStimulus] + 1
   }
   #print(agent$emotional_intensity)
-  reward_2 <- agent$desired_emotional_intensity - agent$emotional_intensity
+  reward_2 <- 10 - abs(agent$desired_emotional_intensity - agent$emotional_intensity)
   #print(reward_2)
   
   #T3
@@ -62,7 +61,7 @@ for(r in 1:repetitions){
     agent$emotional_intensity <- agent$emotional_intensity * .5 
   }
   #print(agent$emotional_intensity)
-  reward_3 <- agent$desired_emotional_intensity - agent$emotional_intensity
+  reward_3 <- 10 - abs(agent$desired_emotional_intensity - agent$emotional_intensity)
   #print(reward_3)
   
   #learning
@@ -103,5 +102,14 @@ for(r in 1:repetitions){
   agent$choice_table$prob_disengage[currentStimulus] <- min(c(agent$choice_table$prob_disengage[currentStimulus], 1))
   
 }
-agent
-sum(agent$choice_table$previous_encounters)
+
+
+#choices over time, across all stimuli
+ggplot2::ggplot(data = agent$choice_table) +
+  ggplot2::geom_point(mapping = ggplot2::aes(x = previous_encounters, y = prob_engage)) +
+  ggplot2::theme_light()
+
+#choices in regard to intensity
+ggplot2::ggplot(data = agent$choice_table) +
+  ggplot2::geom_point(mapping = ggplot2::aes(x = intensity, y = prob_engage)) +
+  ggplot2::theme_light()
