@@ -11,6 +11,7 @@ class Stimulus:
         self.id = id
         self.emo_intensity = emo_intensity
         self.p_recurrence = p_recurrence
+        self.reappraised = False
 
     def get_intensity(self):
         return self.emo_intensity
@@ -62,25 +63,26 @@ class EmotionEnv(gym.Env):
 
     N_ACTIONS = 3
 
-     # Actions
-     INACTION = 0
-     DISENGAGE = 1
-     ENGAGE = 2
+    # Actions
+    INACTION = 0
+    DISENGAGE = 1
+    ENGAGE = 2
 
     def __init__(self,
                  engage_delay: float,
                  engage_benefit: float,
                  disengage_benefit: float,
                  engage_adaptation: float,
-                 emotion_timepoints: float,
+                 current_timepoint: float,
                  stimuli: list,
+                 agent_status: AgentStatus
                  ):
 
         super(EmotionEnv, self).__init__()
 
         self.action_space = Discrete(self.N_ACTIONS)
         self.observation_space = Dict({'stimulus_id': Discrete(len(stimuli)),
-        'emo_intensity': Box(low=0, high=1, shape=(1,), dtype=np.float32),
+        'emo_intensity': Box(low=0, high=10, shape=(1,), dtype=np.float32),
         'emo_step:': Box(low=0, high=2, shape=(1,), dtype=np.int8)})
 
         self.stimuli = stimuli
@@ -89,68 +91,66 @@ class EmotionEnv(gym.Env):
         self.engage_benefit = engage_benefit
         self.engage_adaptation = engage_adaptation
         self.disengage_benefit = disengage_benefit
-        self.emotion_timepoints: emotion_timepoints
+        self.current_timepoint = current_timepoint
+        self.agent_status = agent_status
 
-        self.current_emotion = None
         self.reset()
 
-#     def step(self, action: int) -> tuple:
-#         '''
-#         Execute one timestep in environment
-#         :param action: which action to take
-#         :return: state, reward, done, info
-#         '''
-#         # Take action
-#         if action == self.DISENGAGE:
-#             self._disengage()
-#         elif action == self.ENGAGE:
-#             self._engage()
-#         elif action == self.INACTION:
-#             self._inaction()
-#         else:
-#             raise ValueError(f'Received invalid action {action} which is not part of the action space')
-#
-#         info = None
-#
-#         if self._get_doneness():
-#             done = 1
-#             self.reset()
-#         else:
-#             done = 0
-#
-#         return self.current_emotion.id, self._get_reward(), done, info
-#
-#     def _inaction(self):
-#         self.current_emotion.step()
-#         return self.current_emotion.id
-#
-#     def _disengage(self):
-#         self.current_emotion.step()
-#         trajectory = self.current_emotion.emo_trajectory
-#         trajectory = [x - self.disengage_benefit for x in trajectory]
-#         self.current_emotion.emo_trajectory = np.clip(trajectory, 0, 1)
-#         return self.current_emotion.id
-#
-#     def _engage(self):
-#         self.current_emotion.step()
-#         trajectory = self.current_emotion.emo_trajectory
-#         trajectory[self.engage_delay:] = [x - self.engage_benefit for x in trajectory[self.engage_delay:]]
-#         self.current_emotion.emo_trajectory = np.clip(trajectory, 0, 1)
-#
-#         # Agent adapts to future instances of this stimulus
-#         for stim in self.stimuli:
-#             if stim.id == self.current_emotion.id:
-#                 stim.emo_trajectory -= self.engage_adaptation
-#                 stim.emo_trajectory = np.clip(stim.emo_trajectory, 0, 1)
-#
-#         return self.current_emotion.id
-#
-#     def _get_reward(self):
-#         reward = -1 * self.current_emotion.get_intensity()
-#         return reward
-#
-#     def _get_doneness(self):
-#         return True if self.current_emotion.cur_step >= self.current_emotion.size else False
+    def step(self, action: int) -> tuple:
+        '''
+        Execute one timestep in environment
+        :param action: which action to take
+        :return: state, reward, done, info
+        '''
+        # Take action
+        if action == self.DISENGAGE:
+            self._disengage()
+        elif action == self.ENGAGE:
+            self._engage()
+        elif action == self.INACTION:
+            self._inaction()
+        else:
+            raise ValueError(f'Received invalid action {action} which is not part of the action space')
+
+        info = None
+        self.current_timepoint += 1
+
+        if self._get_doneness():
+            done = 1
+            self.reset()
+        else:
+            done = 0
+
+        return self.agent_status, self._get_reward(), done, info
+
+    def _inaction(self):
+        return self.agent_status
+
+    def _disengage(self):
+        self.agent_status.current_emo_intensity -= self.disengage_benefit
+        return self.agent_status
+
+    def _engage(self):
+        if self.current_timepoint < self.engage_delay:
+            self.agent_status.current_emo_intensity -= self.engage_benefit
+        else:
+            for i in range(0, len(self.agent_status.stimuliAppraisals)):
+                if self.agent_status.stimuliAppraisals[i].id == self.agent_status.current_id:
+                    if not self.agent_status.stimuliAppraisals[i].reappraised:
+                        self.agent_status.stimuliAppraisals[i].emo_intensity -= self.engage_adaptation
+                        self.agent_status.current_emo_intensity -= self.engage_adaptation
+                        self.agent_status.stimuliAppraisals[i].reappraised = True
+                    else:
+                        self.agent_status.current_emo_intensity -= self.engage_benefit
+
+        return self.agent_status
+
+    def _get_reward(self):
+        reward = -1 * self.agent_status.current_emo_intensity
+        return reward
+
+    def _get_doneness(self):
+        return True if self.current_timepoint == 2 else False
 #
 #     def reset(self):
 #         if self.current_emotion is not None:

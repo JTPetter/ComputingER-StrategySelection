@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import path
 
-from environment import Stimulus, AgentStatus
+from environment import Stimulus, AgentStatus, EmotionEnv
 from agent import QTableAgent
 
 
@@ -23,7 +23,7 @@ stimuli_list = [Stimulus(id=1, emo_intensity=8, p_recurrence=1),
 agent_status = AgentStatus()
 # some testing
 # stimuli_list[0].emo_intensity
-# agent_emotion.appraise_stimuli(stimuli_list[2])
+agent_status.appraise_stimuli(stimuli_list[0])
 # agent_emotion.current_id
 # agent_emotion.current_emo_intensity
 # agent_emotion.current_emo_intensity = 10
@@ -31,10 +31,24 @@ agent_status = AgentStatus()
 # agent_emotion.print_list()
 # agent_emotion.stimuliAppraisals[0].emo_intensity = 4
 
+agent_status.current_emo_intensity
+agent_status.stimuliAppraisals[1].emo_intensity
 
+env = EmotionEnv(engage_delay=1,
+                 engage_benefit=2,
+                 disengage_benefit=5,
+                 engage_adaptation=3,
+                 stimuli=stimuli_list,
+                 agent_status=agent_status,
+                 current_timepoint=0
+                 )
+env.agent_status.current_emo_intensity
 
+next_state, reward, done, info = env.step(action=2)
 
-
+next_state.current_emo_intensity
+next_state.stimuliAppraisals[1].emo_intensity
+next_state.stimuliAppraisals[1].reappraised
 
 # #for eng_adapt in np.arange(0, .9, .1):
 # if __name__ == '__main__':
