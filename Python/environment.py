@@ -17,7 +17,7 @@ class Stimulus:
         return self.emo_intensity
 
     def get_dict(self):
-        return {'id': self.id, 'emo_intensity': self.emo_intensity, "p_recurrence": self.p_recurrence}
+        return {'id': self.id, 'emo_intensity': self.emo_intensity, "p_recurrence": self.p_recurrence, 'reappraised': self.reappraised}
 
 
 class AgentStatus:
@@ -27,24 +27,22 @@ class AgentStatus:
         self.current_id = None
         self.current_emo_intensity = None
         self.expected_p_recurrence = None
-        self.previous_encounter = None
+        #self.previous_encounter = None
 
     def print_list(self):
         for i in range(len(self.stimuliAppraisals)):
             print(self.stimuliAppraisals[i].get_dict())
 
     def appraise_stimuli(self, stimulus: Stimulus):  # currently the appraisal function is 1:1, so just a copy
-        self._check_for_previous_encounter(stimulus)
-        if not self.previous_encounter:
+        if not self._check_for_previous_encounter(stimulus):
             self.stimuliAppraisals.append(copy.deepcopy(stimulus))
         self._update_emotional_state(stimulus)
 
     def _check_for_previous_encounter(self, stimulus):
         for i in range(0, len(self.stimuliAppraisals)):
             if self.stimuliAppraisals[i].id == stimulus.id:
-                self.previous_encounter = True
-            else:
-                self.previous_encounter = False
+                return True
+        return False
 
     def _update_emotional_state(self, stimulus):
         for i in range(0, len(self.stimuliAppraisals)):
@@ -63,17 +61,16 @@ class EmotionEnv(gym.Env):
 
     N_ACTIONS = 3
 
-    # Actions
-    INACTION = 0
-    DISENGAGE = 1
-    ENGAGE = 2
+    # # Actions
+    # INACTION = 0
+    # DISENGAGE = 1
+    # ENGAGE = 2
 
     def __init__(self,
                  engage_delay: float,
                  engage_benefit: float,
                  disengage_benefit: float,
                  engage_adaptation: float,
-                 current_timepoint: float,
                  stimuli: list,
                  agent_status: AgentStatus
                  ):
@@ -91,8 +88,9 @@ class EmotionEnv(gym.Env):
         self.engage_benefit = engage_benefit
         self.engage_adaptation = engage_adaptation
         self.disengage_benefit = disengage_benefit
-        self.current_timepoint = current_timepoint
+        self.current_timepoint = 0
         self.agent_status = agent_status
+        self.current_appraisal = None
 
         self.reset()
 
@@ -103,21 +101,21 @@ class EmotionEnv(gym.Env):
         :return: state, reward, done, info
         '''
         # Take action
-        if action == self.DISENGAGE:
+        if action == 1:
             self._disengage()
-        elif action == self.ENGAGE:
+        elif action == 2:
             self._engage()
-        elif action == self.INACTION:
+        elif action == 0:
             self._inaction()
         else:
             raise ValueError(f'Received invalid action {action} which is not part of the action space')
 
         info = None
+
         self.current_timepoint += 1
 
         if self._get_doneness():
             done = 1
-            self.reset()
         else:
             done = 0
 
@@ -128,21 +126,21 @@ class EmotionEnv(gym.Env):
 
     def _disengage(self):
         self.agent_status.current_emo_intensity -= self.disengage_benefit
+        self.agent_status.current_emo_intensity = np.clip(self.agent_status.current_emo_intensity, 0, 10)
         return self.agent_status
 
     def _engage(self):
-        if self.current_timepoint < self.engage_delay:
-            self.agent_status.current_emo_intensity -= self.engage_benefit
-        else:
+        if self.current_timepoint == self.engage_delay:
             for i in range(0, len(self.agent_status.stimuliAppraisals)):
                 if self.agent_status.stimuliAppraisals[i].id == self.agent_status.current_id:
-                    if not self.agent_status.stimuliAppraisals[i].reappraised:
-                        self.agent_status.stimuliAppraisals[i].emo_intensity -= self.engage_adaptation
-                        self.agent_status.current_emo_intensity -= self.engage_adaptation
-                        self.agent_status.stimuliAppraisals[i].reappraised = True
-                    else:
-                        self.agent_status.current_emo_intensity -= self.engage_benefit
-
+                    self.current_appraisal = self.agent_status.stimuliAppraisals[i]
+            if not self.current_appraisal.reappraised:
+                self.current_appraisal.emo_intensity -= self.engage_adaptation
+                self.agent_status.current_emo_intensity -= self.engage_adaptation
+                self.current_appraisal.reappraised = True
+        elif self.current_timepoint != self.engage_delay:
+            self.agent_status.current_emo_intensity -= self.engage_benefit
+        self.agent_status.current_emo_intensity = np.clip(self.agent_status.current_emo_intensity, 0, 10)
         return self.agent_status
 
     def _get_reward(self):
@@ -151,19 +149,24 @@ class EmotionEnv(gym.Env):
 
     def _get_doneness(self):
         return True if self.current_timepoint == 2 else False
-#
-#     def reset(self):
-#         if self.current_emotion is not None:
-#             # TODO: not sure if this is necessary, is this pointing to same object when random choices are made?
-#             self.current_emotion.reset()
-#         self.current_emotion = random.choice(self.stimuli)
-#
-#     def render(self, mode='human'):
-#         '''
-#
-#         :param mode:
-#         :return:
-#         '''
-#         if mode != 'human':
-#             raise NotImplementedError()
-#         print(f'{self.current_emotion.get_dict()}')
+
+    def reset(self):
+        self.current_timepoint = 0
+        new_stimulus = random.choice(self.stimuli)
+        self.agent_status.appraise_stimuli(new_stimulus)
+
+    def render(self, mode='human'):
+        '''
+
+        :param mode:
+        :return:
+        '''
+        if mode != 'human':
+            raise NotImplementedError()
+        for i in range(0, len(self.agent_status.stimuliAppraisals)):
+            if self.agent_status.stimuliAppraisals[i].id == self.agent_status.current_id:
+                self.current_appraisal = self.agent_status.stimuliAppraisals[i]
+
+        print({'timepoint': self.current_timepoint, 'emo_intensity': self.agent_status.current_emo_intensity,
+               'stimulus id': self.agent_status.current_id})
+        print(self.current_appraisal.get_dict())

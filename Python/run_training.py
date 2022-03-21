@@ -39,16 +39,26 @@ env = EmotionEnv(engage_delay=1,
                  disengage_benefit=5,
                  engage_adaptation=3,
                  stimuli=stimuli_list,
-                 agent_status=agent_status,
-                 current_timepoint=0
+                 agent_status=agent_status
                  )
-env.agent_status.current_emo_intensity
 
+#env.agent_status.current_emo_intensity
+env.render()
+env.current_timepoint
 next_state, reward, done, info = env.step(action=2)
+agent_status.print_list()
+env.reset()
+env.current_timepoint
 
 next_state.current_emo_intensity
 next_state.stimuliAppraisals[1].emo_intensity
 next_state.stimuliAppraisals[1].reappraised
+
+for i in range(0, len(agent_status.stimuliAppraisals)):
+    if agent_status.stimuliAppraisals[i].id == stimuli_list[0].id:
+        print(True)
+    else:
+        print(False)
 
 # #for eng_adapt in np.arange(0, .9, .1):
 # if __name__ == '__main__':
