@@ -119,7 +119,7 @@ class EmotionEnv(gym.Env):
         else:
             done = 0
 
-        return self.agent_status, self._get_reward(), done, info
+        return self.agent_status.current_id, self._get_reward(), done, info
 
     def _inaction(self):
         return self.agent_status
